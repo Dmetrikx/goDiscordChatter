@@ -1,4 +1,4 @@
-module github.com/Dmetrikx/open_bot/go
+module github.com/Dmetrikx/goDiscordChatter
 
 go 1.24.11
 
