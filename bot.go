@@ -137,12 +137,17 @@ func (b *Bot) handleAsk(s *discordgo.Session, m *discordgo.MessageCreate, args [
 		return
 	}
 
-	s.ChannelMessageSend(m.ChannelID, "Thinking...")
-
 	provider, args := extractProviderAndArgs(args, "openai")
 	prompt := strings.Join(args, " ")
 
-	response, err := b.aiClient.AskClient(prompt, OpenAIPersona, DefaultOpenAIModel, provider, DefaultMaxTokens)
+	model := DefaultOpenAIModel
+	if provider == "grok" {
+		model = DefaultGrokModel
+	}
+
+	b.sendThinkingMessage(s, m.ChannelID, provider, model)
+
+	response, err := b.aiClient.AskClient(prompt, OpenAIPersona, model, provider, DefaultMaxTokens)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error: %v", err))
 		return
@@ -408,6 +413,7 @@ func (b *Bot) handleImageOpinion(s *discordgo.Session, m *discordgo.MessageCreat
 	var customPrompt *string
 
 	provider, args := extractProviderAndArgs(args, "openai")
+	visionModel := DefaultOpenAIVisionModel
 
 	// Check for attachment first
 	if len(m.Attachments) > 0 {
@@ -458,7 +464,8 @@ func (b *Bot) handleImageOpinion(s *discordgo.Session, m *discordgo.MessageCreat
 	if provider == "grok" {
 		opinion, err = b.aiClient.ImageOpinionGrok(imageURL, OpenAIPersona, customPrompt)
 	} else {
-		opinion, err = b.aiClient.ImageOpinionOpenAI(imageURL, OpenAIPersona, DefaultOpenAIVisionModel, DefaultMaxTokens, customPrompt)
+		b.sendThinkingMessage(s, m.ChannelID, provider, visionModel)
+		opinion, err = b.aiClient.ImageOpinionOpenAI(imageURL, OpenAIPersona, visionModel, DefaultMaxTokens, customPrompt)
 	}
 
 	if err != nil {
@@ -521,4 +528,42 @@ func (b *Bot) handleRoast(s *discordgo.Session, m *discordgo.MessageCreate, args
 	}
 
 	b.sendLongResponse(s, m.ChannelID, response)
+}
+
+func providerDisplayName(provider string) string {
+	switch provider {
+	case "grok":
+		return "Grok"
+	case "openai":
+		return "OpenAI"
+	default:
+		return strings.Title(provider)
+	}
+}
+
+func modelVersion(provider, model string) string {
+	if provider == "grok" && model == DefaultGrokModel {
+		return DefaultGrokModelVersion
+	}
+
+	if provider == "openai" && model == DefaultOpenAIModel {
+		return DefaultOpenAIModelVersion
+	}
+
+	return ""
+}
+
+func (b *Bot) sendThinkingMessage(s *discordgo.Session, channelID, provider, model string) {
+	providerName := providerDisplayName(provider)
+	version := modelVersion(provider, model)
+	modelLabel := model
+
+	//if version != "" {
+	//	modelLabel = fmt.Sprintf("%s (%s)", model, version)
+	//}
+
+	message := fmt.Sprintf("Thinking with %s - knowledge cutoff %s ...", modelLabel, version)
+	log.Printf("[thinking] channel=%s provider=%s model=%s version=%s", channelID, providerName, model, version)
+
+	s.ChannelMessageSend(channelID, message)
 }
