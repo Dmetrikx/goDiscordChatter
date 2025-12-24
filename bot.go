@@ -112,9 +112,12 @@ func (b *Bot) handlePing(s *discordgo.Session, m *discordgo.MessageCreate) {
 // extractProviderAndArgs extracts provider from arguments
 func extractProviderAndArgs(args []string, defaultProvider string) (string, []string) {
 	provider := defaultProvider
-	if len(args) > 0 && (strings.ToLower(args[0]) == "grok" || strings.ToLower(args[0]) == "openai") {
-		provider = strings.ToLower(args[0])
-		args = args[1:]
+	if len(args) > 0 {
+		lower := strings.ToLower(args[0])
+		if lower == ProviderGrok || lower == ProviderOpenAI {
+			provider = lower
+			args = args[1:]
+		}
 	}
 	return provider, args
 }
@@ -137,17 +140,19 @@ func (b *Bot) handleAsk(s *discordgo.Session, m *discordgo.MessageCreate, args [
 		return
 	}
 
-	provider, args := extractProviderAndArgs(args, "openai")
+	provider, args := extractProviderAndArgs(args, DefaultProvider)
 	prompt := strings.Join(args, " ")
 
-	model := DefaultOpenAIModel
-	if provider == "grok" {
-		model = DefaultGrokModel
+	model := DefaultGrokModel
+	persona := GrokPersona
+	if provider == ProviderOpenAI {
+		model = DefaultOpenAIModel
+		persona = OpenAIPersona
 	}
 
 	b.sendThinkingMessage(s, m.ChannelID, provider, model)
 
-	response, err := b.aiClient.AskClient(prompt, OpenAIPersona, model, provider, DefaultMaxTokens)
+	response, err := b.aiClient.AskClient(prompt, persona, model, provider, DefaultMaxTokens)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error: %v", err))
 		return
@@ -182,9 +187,15 @@ func (b *Bot) formatChannelHistory(s *discordgo.Session, channelID string, numMe
 func (b *Bot) handleOpinion(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	s.ChannelMessageSend(m.ChannelID, "Let me think about what everyone has been saying...")
 
-	provider, args := extractProviderAndArgs(args, "openai")
-	numMessages := 10
+	provider, args := extractProviderAndArgs(args, DefaultProvider)
+	model := DefaultGrokModel
+	persona := GrokPersona
+	if provider == ProviderOpenAI {
+		model = DefaultOpenAIModel
+		persona = OpenAIPersona
+	}
 
+	numMessages := 10
 	if len(args) > 0 {
 		if n, err := strconv.Atoi(args[0]); err == nil {
 			numMessages = n
@@ -198,10 +209,10 @@ func (b *Bot) handleOpinion(s *discordgo.Session, m *discordgo.MessageCreate, ar
 	}
 
 	systemMessage := fmt.Sprintf("%s\nHere are the last %d messages in this channel:\n%s\n"+
-		"Form an opinion or summary about the conversation.", OpenAIPersona, numMessages, contextStr)
+		"Form an opinion or summary about the conversation.", persona, numMessages, contextStr)
 
 	response, err := b.aiClient.AskClient("What is your opinion on the recent conversation?",
-		systemMessage, DefaultOpenAIModel, provider, DefaultMaxTokens)
+		systemMessage, model, provider, DefaultMaxTokens)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error: %v", err))
 		return
@@ -214,7 +225,14 @@ func (b *Bot) handleOpinion(s *discordgo.Session, m *discordgo.MessageCreate, ar
 func (b *Bot) handleWhoWon(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	s.ChannelMessageSend(m.ChannelID, "Analyzing the last arguments...")
 
-	provider, args := extractProviderAndArgs(args, "openai")
+	provider, args := extractProviderAndArgs(args, DefaultProvider)
+	model := DefaultGrokModel
+	persona := GrokPersona
+	if provider == ProviderOpenAI {
+		model = DefaultOpenAIModel
+		persona = OpenAIPersona
+	}
+
 	numMessages := 100
 
 	if len(args) > 0 {
@@ -231,10 +249,10 @@ func (b *Bot) handleWhoWon(s *discordgo.Session, m *discordgo.MessageCreate, arg
 
 	systemMessage := fmt.Sprintf("%s\nHere are the last %d messages in this channel:\n%s\n"+
 		"Based on the arguments and discussions, determine who won the arguments and why. "+
-		"Be specific and fair, and explain your reasoning.", OpenAIPersona, numMessages, contextStr)
+		"Be specific and fair, and explain your reasoning.", persona, numMessages, contextStr)
 
 	response, err := b.aiClient.AskClient("Who won the arguments in the recent conversation?",
-		systemMessage, DefaultOpenAIModel, provider, DefaultMaxTokens)
+		systemMessage, model, provider, DefaultMaxTokens)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error: %v", err))
 		return

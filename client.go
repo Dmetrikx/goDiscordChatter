@@ -17,23 +17,35 @@ type AIClient struct {
 	openaiClient *openai.Client
 	openaiAPIKey string
 	xaiAPIKey    string
+	httpClient   *http.Client
 }
 
 // NewAIClient creates a new AI client
 func NewAIClient(openaiAPIKey, xaiAPIKey string) *AIClient {
+	var oaClient *openai.Client
+	if openaiAPIKey != "" {
+		oaClient = openai.NewClient(openaiAPIKey)
+	}
+
 	return &AIClient{
-		openaiClient: openai.NewClient(openaiAPIKey),
+		openaiClient: oaClient,
 		openaiAPIKey: openaiAPIKey,
 		xaiAPIKey:    xaiAPIKey,
+		httpClient:   &http.Client{},
 	}
 }
 
 // AskClient sends a prompt to OpenAI or Grok with a system message and returns the response
 func (c *AIClient) AskClient(prompt, systemMessage, model, provider string, maxTokens int) (string, error) {
-	if provider == "grok" {
-		return c.askGrok(prompt, systemMessage)
+	switch provider {
+	case ProviderOpenAI:
+		if c.openaiClient == nil {
+			return "", fmt.Errorf("OpenAI support is deprecated; set OPENAI_API_KEY to enable overrides")
+		}
+		return c.askOpenAI(prompt, systemMessage, model, maxTokens)
+	default:
+		return c.askGrok(prompt, systemMessage, model, maxTokens)
 	}
-	return c.askOpenAI(prompt, systemMessage, model, maxTokens)
 }
 
 // askOpenAI sends a request to OpenAI API
@@ -70,17 +82,27 @@ func (c *AIClient) askOpenAI(prompt, systemMessage, model string, maxTokens int)
 }
 
 // askGrok sends a request to Grok API
-func (c *AIClient) askGrok(prompt, systemMessage string) (string, error) {
+func (c *AIClient) askGrok(prompt, systemMessage, model string, maxTokens int) (string, error) {
 	if c.xaiAPIKey == "" {
 		return "", fmt.Errorf("XAI_API_KEY environment variable not set")
 	}
 
+	grokModel := model
+	if grokModel == "" {
+		grokModel = DefaultGrokModel
+	}
+
+	if maxTokens == 0 {
+		maxTokens = DefaultMaxTokens
+	}
+
 	requestBody := map[string]interface{}{
-		"model": "grok-3",
+		"model": grokModel,
 		"messages": []map[string]string{
 			{"role": "system", "content": systemMessage},
 			{"role": "user", "content": prompt},
 		},
+		"max_tokens": maxTokens,
 	}
 
 	jsonData, err := json.Marshal(requestBody)
@@ -96,8 +118,7 @@ func (c *AIClient) askGrok(prompt, systemMessage string) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.xaiAPIKey))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
@@ -176,8 +197,7 @@ func (c *AIClient) ImageOpinionOpenAI(imageURL, systemMessage, model string, max
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.openaiAPIKey))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
@@ -259,8 +279,7 @@ func (c *AIClient) ImageOpinionGrok(imageURL, systemMessage string, customPrompt
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.xaiAPIKey))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
