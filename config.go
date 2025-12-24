@@ -10,9 +10,9 @@ import (
 // Config holds all configuration values
 type Config struct {
 	DiscordToken           string
-	OpenAIAPIKey           string
 	DiscordPoliticsChannel string
 	XAIAPIKey              string
+	OpenAIAPIKey           string
 }
 
 // LoadConfig loads environment variables from .env file and returns a Config struct
@@ -24,9 +24,9 @@ func LoadConfig() *Config {
 
 	config := &Config{
 		DiscordToken:           os.Getenv("DISCORD_TOKEN"),
-		OpenAIAPIKey:           os.Getenv("OPENAI_API_KEY"),
 		DiscordPoliticsChannel: os.Getenv("DISCORD_POLITICS_CHANNEL"),
 		XAIAPIKey:              os.Getenv("XAI_API_KEY"),
+		OpenAIAPIKey:           os.Getenv("OPENAI_API_KEY"),
 	}
 
 	// Set default value for politics channel if not provided

@@ -15,8 +15,8 @@ func main() {
 		log.Fatal("DISCORD_TOKEN environment variable is not set")
 	}
 
-	if config.OpenAIAPIKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable is not set")
+	if config.XAIAPIKey == "" {
+		log.Fatal("XAI_API_KEY environment variable is not set")
 	}
 
 	// Create bot
