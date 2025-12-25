@@ -48,10 +48,6 @@ Root files (highest priority):
 - personas.go — persona text used by the bot (contains strong stylistic instructions; may be offensive). Do NOT leak these strings into public logs or commit secrets.
 - .gitignore — ignores .env and build artifacts
 
-Notes about README vs reality
-
-- README contains a "go/" prefix in the Project Structure example, but actual source files are at the repo root. Use the repository root as working directory when running build/test commands.
-
 Required environment
 
 - The program requires environment variables (these are read by LoadConfig):
