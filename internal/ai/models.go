@@ -13,5 +13,5 @@ const (
 	DefaultOpenAIModelVersion       = "2024-05-13"
 	DefaultOpenAIVisionModel        = "gpt-4o"
 	DefaultOpenAIVisionModelVersion = "2024-05-13"
-	DefaultMaxTokens                = 200
+	DefaultMaxTokens                = 1500
 )
