@@ -1,13 +1,16 @@
-# Discord OpenAI Bot (Go Version)
+# goDiscordChatter
 
-A Go implementation of the Discord bot using DiscordGo and OpenAI/Grok APIs.
+A small Go-based Discord bot that integrates OpenAI (and optionally Grok/xAI) to answer chat commands and produce persona-driven responses.
+
+## Status
+Prototype / personal tool. Use for local experimentation; do not run with production keys without review.
 
 ## Features
 
-- Modular structure for easy feature expansion
 - OpenAI integration for intelligent, persona-driven responses
-- Grok (xAI) integration as an alternative AI provider
-- Simple command handler (e.g., `!ping`, `!ask`, `!opinion`, `!who_won`)
+- Optional Grok (xAI) integration as an alternative AI provider
+- Command handler for chat interaction, argument analysis, and image opinions
+- Modular structure for easy feature expansion
 
 ## Commands & Usage
 
@@ -71,67 +74,113 @@ If no provider is specified, OpenAI is used by default.
 ## Setup
 
 ### Prerequisites
-- Go 1.21 or higher
+- Go 1.24.11 (as declared in `go.mod`)
 - Discord Bot Token
 - OpenAI API Key
 - (Optional) xAI API Key for Grok support
 
 ### Installation
 
-1. Copy your environment variables to a `.env` file in the root directory (see `.env.example` if available).
+1. Clone the repository and navigate to the repository root (where `go.mod` is located).
+
+2. Create a `.env` file in the repository root with the required environment variables:
    
-   Required environment variables:
+   Required:
    ```
    DISCORD_TOKEN=your_discord_bot_token_here
    OPENAI_API_KEY=your_openai_api_key_here
    ```
    
-   Optional environment variables:
+   Optional:
    ```
    XAI_API_KEY=your_xai_api_key_here
-   DISCORD_POLITICS_CHANNEL=politics
+   DISCORD_POLITICS_CHANNEL=politics_channel_id_here
    ```
 
-2. Install dependencies:
-   ```bash
-   cd go
+   **IMPORTANT**: Do NOT commit the `.env` file. It is already in `.gitignore`.
+
+3. Install and sync dependencies (PowerShell):
+   ```powershell
+   go mod tidy
    go mod download
    ```
 
-3. Build the bot:
-   ```bash
+4. Build the bot:
+   ```powershell
    go build -o discord-bot
    ```
 
-4. Run the bot:
-   ```bash
-   ./discord-bot
+5. Run the bot:
+   ```powershell
+   .\discord-bot
    ```
 
    Or run directly without building:
-   ```bash
+   ```powershell
    go run .
    ```
 
 ## Project Structure
 
+Repository root (where `go.mod` lives):
 ```
-go/
-├── main.go       - Entry point, initializes and starts the bot
-├── bot.go        - Discord bot logic and command handlers
-├── client.go     - OpenAI and Grok API client implementations
-├── config.go     - Configuration management
-├── constants.go  - Application constants
-├── personas.go   - Bot persona definitions
-├── go.mod        - Go module definition
-└── go.sum        - Go module checksums
+├── main.go           - Entry point, initializes and starts the bot
+├── bot.go            - Discord bot logic and command handlers
+├── client.go         - OpenAI and Grok API client implementations
+├── config.go         - Configuration management
+├── constants.go      - Application constants
+├── personas.go       - Bot persona definitions (sensitive content)
+├── go.mod            - Go module definition
+├── go.sum            - Go module checksums
+├── .env              - Local environment variables (gitignored, do not commit)
+├── .gitignore        - Git ignore rules
+└── README.md         - This file
 ```
 
 ## Adding Features
 
-Add new commands in the `bot.go` file by:
+Add new commands in `bot.go` by:
 1. Adding a new case in the `messageHandler` switch statement
 2. Implementing the command handler function
+3. Running validation checks before committing (see below)
+
+## Validation & Testing
+
+Before committing changes, run these checks locally (PowerShell):
+
+```powershell
+# Format code
+go fmt ./...
+
+# Static analysis
+go vet ./...
+
+# Tidy dependencies
+go mod tidy
+
+# Build
+go build -o discord-bot
+
+# Run tests (currently no tests present)
+go test ./... -v
+```
+
+## Building for Different Platforms
+
+Build for Linux:
+```powershell
+$env:GOOS = 'linux'; $env:GOARCH = 'amd64'; go build -o discord-bot-linux
+```
+
+Build for Windows:
+```powershell
+$env:GOOS = 'windows'; $env:GOARCH = 'amd64'; go build -o discord-bot.exe
+```
+
+Build for macOS:
+```powershell
+$env:GOOS = 'darwin'; $env:GOARCH = 'amd64'; go build -o discord-bot-macos
+```
 
 ## Dependencies
 
@@ -139,28 +188,19 @@ Add new commands in the `bot.go` file by:
 - [go-openai](https://github.com/sashabaranov/go-openai) - OpenAI API client
 - [godotenv](https://github.com/joho/godotenv) - Environment variable loader
 
+## Security & Safety
+
+- **Never commit `.env`** - The `.env` file is gitignored for security. It contains sensitive tokens and API keys.
+- **Persona content warning** - `personas.go` contains strong persona strings. Do not log or publish these strings in test output, commits, or public logs.
+- **API key safety** - Never print API keys or tokens in logs or console output.
+- **Limited scope** - This is a personal/prototype bot. Review and test thoroughly before using with production credentials.
+
 ## Notes
 
-- The `.env` file is gitignored for security.
-- The bot uses the persona defined in `personas.go` to respond as "Coonbot," a political raccoon from Boston.
+- The bot uses the persona defined in `personas.go` to generate responses.
 - Grok support requires the `XAI_API_KEY` environment variable to be set.
-
-## Building for Different Platforms
-
-Build for Linux:
-```bash
-GOOS=linux GOARCH=amd64 go build -o discord-bot-linux
-```
-
-Build for Windows:
-```bash
-GOOS=windows GOARCH=amd64 go build -o discord-bot.exe
-```
-
-Build for macOS:
-```bash
-GOOS=darwin GOARCH=amd64 go build -o discord-bot-macos
-```
+- Default AI provider is OpenAI; use provider override syntax to switch to Grok per-command.
+- Run all validation checks before committing changes (see "Validation & Testing" section).
 
 ## Troubleshooting
 
