@@ -12,4 +12,7 @@ type Client interface {
 
 	// ImageOpinionGrok sends an image to Grok's vision endpoint
 	ImageOpinionGrok(ctx context.Context, imageURL, systemMessage string, customPrompt *string) (string, error)
+
+	// SuggestMessageBreaks uses AI to break a message into natural chunks for human-like delivery
+	SuggestMessageBreaks(ctx context.Context, message string) ([]string, error)
 }

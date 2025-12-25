@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
@@ -394,4 +395,119 @@ func (c *AIClient) downloadAndEncodeImage(ctx context.Context, imageURL string) 
 	}
 
 	return base64.StdEncoding.EncodeToString(imageData), nil
+}
+
+// SuggestMessageBreaks uses AI to intelligently break a message into natural chunks
+// that feel more human and conversational, like following up thoughts with additional messages
+func (c *AIClient) SuggestMessageBreaks(ctx context.Context, message string) ([]string, error) {
+	// If message is short enough, return as-is
+	if len(message) <= 500 {
+		return []string{message}, nil
+	}
+
+	c.logger.InfoContext(ctx, "requesting message break suggestions",
+		"message_length", len(message))
+
+	systemPrompt := `You are a message chunking assistant. Your job is to break up messages into natural, conversational chunks 
+that feel like how humans text - following up one message with more messages as they flesh out their thoughts.
+
+Rules:
+1. Split at natural thought boundaries (paragraphs, topic shifts, etc.)
+2. Each chunk should be a complete thought or idea
+3. Aim for 3-5 chunks for longer messages
+4. Preserve the exact original text - no changes to content
+5. Respond ONLY with the chunks separated by the delimiter: <<<BREAK>>>
+6. Do not add any explanations or commentary
+
+Example input: "I think pizza is great. It has cheese and sauce. But honestly, the best part is the crust when it's done right. Brooklyn style is my favorite."
+
+Example output: "I think pizza is great. It has cheese and sauce.<<<BREAK>>>But honestly, the best part is the crust when it's done right.<<<BREAK>>>Brooklyn style is my favorite."`
+
+	userPrompt := fmt.Sprintf("Break this message into natural conversational chunks:\n\n%s", message)
+
+	// Use Grok as default for this utility function (faster and cheaper)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	response, err := c.askGrok(ctx, userPrompt, systemPrompt, DefaultGrokModel, 1000)
+	if err != nil {
+		c.logger.ErrorContext(ctx, "failed to get message breaks, falling back to simple chunking", "error", err)
+		// Fallback to simple paragraph-based chunking
+		return c.fallbackMessageBreaks(message), nil
+	}
+
+	// Parse the response
+	chunks := c.parseMessageBreaks(response, message)
+
+	c.logger.InfoContext(ctx, "message broken into chunks",
+		"original_length", len(message),
+		"chunk_count", len(chunks))
+
+	return chunks, nil
+}
+
+// parseMessageBreaks parses the AI response and validates chunks
+func (c *AIClient) parseMessageBreaks(response, originalMessage string) []string {
+	chunks := []string{}
+	parts := []string{}
+
+	// Split by the delimiter
+	for _, part := range []string{response} {
+		parts = append(parts, strings.Split(part, "<<<BREAK>>>")...)
+	}
+
+	// Clean and validate chunks
+	for _, chunk := range parts {
+		chunk = strings.TrimSpace(chunk)
+		if chunk != "" && len(chunk) <= 2000 {
+			chunks = append(chunks, chunk)
+		}
+	}
+
+	// If parsing failed or resulted in just one chunk, fallback
+	if len(chunks) <= 1 {
+		return c.fallbackMessageBreaks(originalMessage)
+	}
+
+	return chunks
+}
+
+// fallbackMessageBreaks provides a simple fallback chunking strategy
+func (c *AIClient) fallbackMessageBreaks(message string) []string {
+	chunks := []string{}
+
+	// Try splitting by double newlines (paragraphs)
+	paragraphs := strings.Split(message, "\n\n")
+
+	currentChunk := ""
+	for _, para := range paragraphs {
+		para = strings.TrimSpace(para)
+		if para == "" {
+			continue
+		}
+
+		// If adding this paragraph would exceed a reasonable chunk size, start new chunk
+		if len(currentChunk) > 0 && len(currentChunk)+len(para)+2 > 800 {
+			chunks = append(chunks, strings.TrimSpace(currentChunk))
+			currentChunk = para
+		} else {
+			if len(currentChunk) > 0 {
+				currentChunk += "\n\n" + para
+			} else {
+				currentChunk = para
+			}
+		}
+	}
+
+	// Add the last chunk
+	if len(currentChunk) > 0 {
+		chunks = append(chunks, strings.TrimSpace(currentChunk))
+	}
+
+	// If we still have just one chunk or none, return the original message
+	if len(chunks) <= 1 {
+		return []string{message}
+	}
+
+	return chunks
 }

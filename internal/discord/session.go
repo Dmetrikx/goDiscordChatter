@@ -18,6 +18,9 @@ type Session interface {
 	// ChannelMessageSend sends a message to a channel
 	ChannelMessageSend(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
 
+	// ChannelTyping triggers a typing indicator in a channel for ~10 seconds
+	ChannelTyping(channelID string, options ...discordgo.RequestOption) error
+
 	// ChannelMessages retrieves messages from a channel
 	ChannelMessages(channelID string, limit int, beforeID, afterID, aroundID string, options ...discordgo.RequestOption) ([]*discordgo.Message, error)
 

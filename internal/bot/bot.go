@@ -579,7 +579,7 @@ func (b *Bot) sendThinkingMessage(ctx context.Context, s *discordgo.Session, cha
 	version := getModelVersion(provider, model)
 	modelLabel := model
 
-	message := fmt.Sprintf("Thinking with %s - knowledge cutoff %s ...", modelLabel, version)
+	message := fmt.Sprintf("*Thinking with %s - knowledge cutoff %s ...*", modelLabel, version)
 	b.logger.InfoContext(ctx, "sending thinking message",
 		"channel_id", channelID,
 		"provider", providerName,
