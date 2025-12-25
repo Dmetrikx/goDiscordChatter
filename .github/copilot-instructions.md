@@ -6,9 +6,10 @@ This document tells a coding assistant everything it needs to quickly make safe,
 
 Summary
 
-- What this repo is: a Go-based Discord bot that integrates OpenAI (and optionally Grok/xAI) to answer chat commands and produce persona-driven responses. Core behavior lives in Go source files at the repository root (not in a nested "go/" folder).
+- What this repo is: a Go-based Discord bot that integrates OpenAI (and optionally Grok/xAI) to answer chat commands and produce persona-driven responses. Core behavior is organized in the `internal/` directory with packages for ai, bot, config, discord, and logging.
 - Language & tooling: Go module (go.mod declares go 1.24.11), standard Go toolchain (go build/go test/go vet), and uses these third-party libs: github.com/bwmarrin/discordgo, github.com/sashabaranov/go-openai, github.com/joho/godotenv.
-- Size & expected complexity: small single-module repo (~10 source files). No CI workflows (.github/workflows) were found as of this file's creation.
+- Size & expected complexity: small single-module repo (~15 source files in internal/). No CI workflows (.github/workflows) were found as of this file's creation.
+- Testing: Unit tests exist for bot handlers, formatting utilities, and configuration validation. Run `go test ./... -v` to execute them.
 
 Agent Coding Persona (recommended)
 
@@ -40,20 +41,40 @@ Project layout (important files)
 Root files (highest priority):
 - README.md — usage, commands, env var list, build hints
 - go.mod, go.sum — module and dependencies (go version: 1.24.11)
-- main.go — program entrypoint; calls LoadConfig(), NewBot(), Start(), waits for SIGINT
-- bot.go — main bot implementation and command handlers (!ping, !ask, !opinion, !who_won, !user_opinion, !most, !image_opinion, !roast)
-- client.go — AI client wrappers (OpenAI/Grok) used by bot (refer to for model/HTTP code)
-- config.go — environment loader (uses github.com/joho/godotenv) and Config struct (reads DISCORD_TOKEN, OPENAI_API_KEY, XAI_API_KEY, DISCORD_POLITICS_CHANNEL)
-- constants.go — runtime constants and defaults
-- personas.go — persona text used by the bot (contains strong stylistic instructions; may be offensive). Do NOT leak these strings into public logs or commit secrets.
+- main.go — program entrypoint; calls config.LoadConfig(), bot.NewBot(), bot.Start(), waits for SIGINT
+
+Internal packages (core implementation):
+- internal/ai/
+  - client.go — AI client wrappers (OpenAI/Grok) with AskClient, AskWithImage methods
+  - interface.go — AI client interface definition
+  - models.go — model constants and configurations
+  - personas.go — persona text used by the bot (contains strong stylistic instructions; may be offensive). Do NOT leak these strings into public logs or commit secrets.
+  - errors.go — AI-specific error types
+- internal/bot/
+  - bot.go — main bot implementation and command handlers (!ping, !ask, !opinion, !who_won, !user_opinion, !most, !image_opinion, !roast)
+  - constants.go — bot-specific constants and defaults
+  - formatting.go — message formatting and chunking utilities
+  - formatting_test.go — unit tests for formatting functions
+  - handlers_test.go — unit tests for command parsing and helper functions
+- internal/config/
+  - config.go — environment loader (uses github.com/joho/godotenv) and Config struct (reads DISCORD_TOKEN, OPENAI_API_KEY, XAI_API_KEY, DISCORD_POLITICS_CHANNEL)
+  - config_test.go — unit tests for configuration loading and validation
+  - errors.go — config-specific error types
+- internal/discord/
+  - session.go — Discord session wrapper and interface
+- internal/logging/
+  - logger.go — structured logging implementation using slog
+
+Other files:
 - .gitignore — ignores .env and build artifacts
 
 Required environment
 
-- The program requires environment variables (these are read by LoadConfig):
+- The program requires environment variables (these are read by config.LoadConfig in internal/config):
   - DISCORD_TOKEN (required to run the bot)
-  - OPENAI_API_KEY (required to call OpenAI)
+  - OPENAI_API_KEY (required to call OpenAI, unless only using Grok)
   - XAI_API_KEY (optional; used for Grok/xAI provider)
+  - DISCORD_POLITICS_CHANNEL (optional; defaults to "politics")
 - The repo uses a .env file if present (godotenv.Load(".env")). The .env file is in .gitignore and should not be committed.
 
 Validated bootstrap, build and test commands (Windows PowerShell)
@@ -89,29 +110,30 @@ I validated these commands in PowerShell in this repo. Run them from the reposit
 5) Tests:
    go test ./... -v
 
-   Note: there are currently no test files; `go test` exits with "[no test files]" for this module. If you add tests, run these commands and ensure they pass locally.
+   Note: Unit tests exist for internal/bot (formatting, handlers), internal/config (config validation), and pass successfully. Always run tests after making changes.
 
 Observed outputs and validation
 
 - go mod tidy / go mod download: completed successfully on a local run.
 - go build ./...: completed successfully when executed from the repo root.
 - go vet ./...: no notable output (no vet issues found during validation).
-- go test ./... -v: returned `[no test files]` (no tests present).
+- go test ./... -v: all tests pass (bot formatting, handlers, and config validation tests).
 
 Common gotchas / repo-specific notes
 
 - .env handling: code calls godotenv.Load(".env"). If you run the program locally, create a .env file in the repo root with DISCORD_TOKEN and OPENAI_API_KEY. Do NOT commit .env.
-- README mismatch: README references a "go/" subdirectory for examples; the actual code is in the root. Use repository root.
-- Persona content: `personas.go` contains aggressive, explicit persona strings. Be cautious: do not introduce changes that publish those strings to public logs or telemetry. Don't accidentally include them in test output or PR descriptions.
+- Persona content: `internal/ai/personas.go` contains aggressive, explicit persona strings. Be cautious: do not introduce changes that publish those strings to public logs or telemetry. Don't accidentally include them in test output or PR descriptions.
 - No CI workflows detected: assume no automated checks run on push. Before opening a PR, run the bootstrap/build/test/lint steps above locally and ensure they pass.
 - Secrets: never commit tokens/keys. The repo already .gitignores .env.
+- Package organization: All core logic is in `internal/` packages. The main.go file is minimal and only wires everything together.
 
 Change guidance (where to edit for common tasks)
 
-- Add a new bot command: edit `bot.go` and add a new case in the messageHandler switch and implement the handler below.
-- Change config/env keys: edit `config.go` and the LoadConfig function. Keep .env handling.
-- Change AI behavior: edit `client.go` and `personas.go` (personas.go only for persona text — handle carefully).
+- Add a new bot command: edit `internal/bot/bot.go` and add a new case in the messageHandler switch and implement the handler below. Add tests in `internal/bot/handlers_test.go`.
+- Change config/env keys: edit `internal/config/config.go` and the LoadConfig function. Add validation in Validate(). Update tests in `internal/config/config_test.go`.
+- Change AI behavior: edit `internal/ai/client.go` and `internal/ai/personas.go` (personas.go only for persona text — handle carefully).
 - Add tests: create `_test.go` files alongside the package files and use `go test ./... -v`.
+- Change logging: edit `internal/logging/logger.go` for structured logging modifications.
 
 Safety & PR checklist (small, concrete)
 

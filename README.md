@@ -124,25 +124,42 @@ If no provider is specified, OpenAI is used by default.
 
 Repository root (where `go.mod` lives):
 ```
-├── main.go           - Entry point, initializes and starts the bot
-├── bot.go            - Discord bot logic and command handlers
-├── client.go         - OpenAI and Grok API client implementations
-├── config.go         - Configuration management
-├── constants.go      - Application constants
-├── personas.go       - Bot persona definitions (sensitive content)
-├── go.mod            - Go module definition
-├── go.sum            - Go module checksums
-├── .env              - Local environment variables (gitignored, do not commit)
-├── .gitignore        - Git ignore rules
-└── README.md         - This file
+├── main.go                         - Entry point, initializes and starts the bot
+├── internal/
+│   ├── ai/
+│   │   ├── client.go              - AI client implementations (OpenAI & Grok)
+│   │   ├── errors.go              - AI-specific error types
+│   │   ├── interface.go           - AI client interface
+│   │   ├── models.go              - AI model definitions and constants
+│   │   └── personas.go            - Bot persona definitions (sensitive content)
+│   ├── bot/
+│   │   ├── bot.go                 - Discord bot logic and command handlers
+│   │   ├── constants.go           - Bot-specific constants
+│   │   ├── formatting.go          - Message formatting utilities
+│   │   ├── formatting_test.go     - Formatting unit tests
+│   │   └── handlers_test.go       - Command handler unit tests
+│   ├── config/
+│   │   ├── config.go              - Configuration management
+│   │   ├── config_test.go         - Configuration unit tests
+│   │   └── errors.go              - Config-specific error types
+│   ├── discord/
+│   │   └── session.go             - Discord session wrapper
+│   └── logging/
+│       └── logger.go              - Structured logging implementation
+├── go.mod                          - Go module definition
+├── go.sum                          - Go module checksums
+├── .env                            - Local environment variables (gitignored, do not commit)
+├── .gitignore                      - Git ignore rules
+└── README.md                       - This file
 ```
 
 ## Adding Features
 
-Add new commands in `bot.go` by:
+Add new commands in `internal/bot/bot.go` by:
 1. Adding a new case in the `messageHandler` switch statement
 2. Implementing the command handler function
-3. Running validation checks before committing (see below)
+3. Adding unit tests in `internal/bot/handlers_test.go`
+4. Running validation checks before committing (see below)
 
 ## Validation & Testing
 
@@ -161,9 +178,11 @@ go mod tidy
 # Build
 go build -o discord-bot
 
-# Run tests (currently no tests present)
+# Run tests
 go test ./... -v
 ```
+
+**Note**: The project includes unit tests for bot handlers, formatting utilities, and configuration validation.
 
 ## Building for Different Platforms
 
@@ -191,15 +210,17 @@ $env:GOOS = 'darwin'; $env:GOARCH = 'amd64'; go build -o discord-bot-macos
 ## Security & Safety
 
 - **Never commit `.env`** - The `.env` file is gitignored for security. It contains sensitive tokens and API keys.
-- **Persona content warning** - `personas.go` contains strong persona strings. Do not log or publish these strings in test output, commits, or public logs.
+- **Persona content warning** - `internal/ai/personas.go` contains strong persona strings. Do not log or publish these strings in test output, commits, or public logs.
 - **API key safety** - Never print API keys or tokens in logs or console output.
 - **Limited scope** - This is a personal/prototype bot. Review and test thoroughly before using with production credentials.
 
 ## Notes
 
-- The bot uses the persona defined in `personas.go` to generate responses.
+- The bot uses the persona defined in `internal/ai/personas.go` to generate responses.
 - Grok support requires the `XAI_API_KEY` environment variable to be set.
 - Default AI provider is OpenAI; use provider override syntax to switch to Grok per-command.
+- The project uses structured logging via `slog` for better observability.
+- All packages in `internal/` are designed for dependency injection and testability.
 - Run all validation checks before committing changes (see "Validation & Testing" section).
 
 ## Troubleshooting
